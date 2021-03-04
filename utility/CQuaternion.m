@@ -3,8 +3,6 @@ classdef CQuaternion < handle
     %   Detailed explanation goes here
     
     properties (SetAccess = private)
-        m_Quat = [1 0 0 0];
-        m_FixedAngDeg = [0 1 2];
     end
     
     methods (Static)
@@ -12,6 +10,19 @@ classdef CQuaternion < handle
         function Q = SetByArray( Quats )
             Q = Quats / norm(Quats);
         end
+        
+        %% Display quat, fixed angles, angle & axis
+        function disp(Q)
+            fixed_angles = CQuaternion.QuatToFixedAngles(Q);
+            fixed_angles = rad2deg(fixed_angles);
+            [angle, axis] = CQuaternion.GetAngleAxis(Q);
+            angle = rad2deg(angle);
+            fprintf('Quat: %f, %f, %f, %f\n', Q(1), Q(2), Q(3), Q(4));
+            fprintf('Fixed Angles: %f, %f, %f\n', fixed_angles(1), fixed_angles(2), fixed_angles(3));
+            fprintf('Angle: %f, Axis: %f, %f, %f\n', angle, axis(1), axis(2), axis(3));
+          
+        end
+    
         %% CQuaternion Multiplication
         function Q = Multiply( Q1, Q2 )
             a = Q1(1);
@@ -25,11 +36,11 @@ classdef CQuaternion < handle
             Q = Q / norm( Q );
         end
         
-        %% setting quaternion by fixed angle roll pitch yaw / XYZ in degrees
-        function Q = RPY2Quat( R, P, Y )
-            R = deg2rad(R);
-            P = deg2rad(P);
-            Y = deg2rad(Y);
+        %% setting quaternion by fixed angles / XYZ in radian
+        function Q = FixedAnglesToQuat( angles )
+            R = angles(1);
+            P = angles(2);
+            Y = angles(3);
             
             cr = cos( 0.5 * R );
             sr = sin( 0.5 * R );
@@ -46,8 +57,8 @@ classdef CQuaternion < handle
             Q = Q / norm(Q);
         end
         
-        %% setting fixed angle roll pitch yaw / XYZ in degrees by quaternion
-        function FixedAngles = Quat2RPY( Q )
+        %% setting fixed angle roll pitch yaw / XYZ in radians by quaternion
+        function FixedAngles = QuatToFixedAngles( Q )
             temp = Q(1)*Q(3) - Q(2)*Q(4);
             if abs(temp) >= 0.4999
                 if temp < 0
@@ -116,9 +127,9 @@ classdef CQuaternion < handle
         
         
         %% Roll pitch yaw transforming to rotation matrix
-        function Rot = RPY2Rot( R, P, Y )
-            order = [ 1 R*pi/180; 2 P*pi/180; 3 Y*pi/180;];
-            Rot = CQuaternion.rotationMod( order, 0 );
+        function Rot = FixedAngleToRot( angles )
+            angles = rad2deg(angles);
+            Rot = rotz(angles(3)) * roty(angles(2)) * rotx(angles(1));
         end
         
         %% rotation matrix with self-defined order and fixed or euler method
@@ -149,20 +160,20 @@ classdef CQuaternion < handle
         end
         
         %% rotaion matrix transforming to roll pitch yaw
-        function RPY = Rot2RPY( Rot )
+        function fixed_angles = Rot2FixedAngles( Rot )
             Quat = CQuaternion.Rot2Quat( Rot );
-            RPY = CQuaternion.Quat2RPY( Quat ) * 180 / pi;
+            fixed_angles = CQuaternion.Quat2RPY( Quat ) * 180 / pi;
         end
         
         %% difference between two RPY angles
         % by inputing start and end RPY angles, return the difference between them
         % which can be used when constructing an INCMOVL command
-        function RPY_Diff = RotDiff( RPY1, RPY2 )
-            Q1 = CQuaternion.RPY2Quat( RPY1( 1 ), RPY1( 2 ), RPY1( 3 ) );
-            Q2 = CQuaternion.RPY2Quat( RPY2( 1 ), RPY2( 2 ), RPY2( 3 ) );
+        function angles_diff = RotDiff( a1, a2 )
+            Q1 = CQuaternion.FixedAnglesToQuat( a1( 1 ), a1( 2 ), a1( 3 ) );
+            Q2 = CQuaternion.FixedAnglesToQuat( a2( 1 ), a2( 2 ), a2( 3 ) );
             
             QDiff = CQuaternion.Diff( Q1, Q2 );
-            RPY_Diff = CQuaternion.Quat2RPY( QDiff ) * 180  / pi;
+            angles_diff = CQuaternion.QuatToFixedAngles( QDiff );
         end
         
         %% Slerp interpolation of two quats
@@ -188,10 +199,9 @@ classdef CQuaternion < handle
         end
         
         %% Get angle
-        function ans = GetAngleAxis( q )
+        function [angle, axis] = GetAngleAxis( q )
            angle = acos(q(1)) * 2;
            axis = CQuaternion.GetAxis( q );
-           ans = [angle, axis];
         end
         
         %% Get Quaternion interpolation 
